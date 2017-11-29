@@ -132,6 +132,7 @@ int loadFTT(char settingsFileName[], char areasFileName[]) {
             printf("'Number of areas' (%d) and areas suppled (%d) do not match.\n", noOfAreas, count);
             return 0;
         }
+        free(document); //Free allocated memory
     }
     return 1; //All tasks completed sucesfully
 }
@@ -142,7 +143,10 @@ int loadFTT(char settingsFileName[], char areasFileName[]) {
  */
 double model(int plan[]) {
     //Make a copy of the households array that we are able to edit
-    int copyHouseholds[noOfAreas]; copyArray(households, copyHouseholds);
+    int copyHouseholds[noOfAreas];
+    for(int i = 0; i < noOfAreas; i++) {
+        copyHouseholds[i] = households[i];
+    }
     int totalCustomers = 0, totalDevelopments = 0;
     double NPV = 0, expenditure = 0, income = 0;
     for(int year = 1; year <= studyPeriod; year++) { //For each year
@@ -251,7 +255,6 @@ void printIndividual(int individual[noOfAreas]) {
 
 /* Main Evolutionary loop
  * param _Bool Print generational stats
- *
  */
 void run(int print) {
     int population[POPULATION_SIZE][noOfAreas];
@@ -273,6 +276,10 @@ void runFor(int runs) {
 }
 
 int main(int argc, const char * argv[]) {
+    printf("----- OPTIMAL FFTx ROLLOUT GA -----\n");
+    printf("Matthew Mansell (mcm36)\n");
+    
+    
     char settingsFile[100], areasFile[100];
     strcpy(settingsFile, argv[1]); strcpy(areasFile, argv[2]);
     if(loadFTT(settingsFile, areasFile) != 1) {
@@ -281,18 +288,66 @@ int main(int argc, const char * argv[]) {
     }
     printf("FFT data loaded sucesfully.\n");
     
-    printf("Number of areas: %d\n", noOfAreas);
-    printf("Study period: %d\n", studyPeriod);
-    printf("Annual rental charges: %.2f\n", rental);
-    printf("CAPEX: %.2f\n", capex);
-    printf("OPEX: %.2f\n", opex);
-    printf("Interest rate: %.1f\n", interest);
-    printf("Maximum rollout period: %d\n", maxRolloutPeriod);
+    //printf("Number of areas: %d\n", noOfAreas);
+    //printf("Study period: %d\n", studyPeriod);
+    //printf("Annual rental charges: %.2f\n", rental);
+    //printf("CAPEX: %.2f\n", capex);
+    //printf("OPEX: %.2f\n", opex);
+    //printf("Interest rate: %.1f\n", interest);
+    //printf("Maximum rollout period: %d\n", maxRolloutPeriod);
     
-    for(int i = 0; i < noOfAreas; i++) {
-        printf("%d | %.9Lf\n", households[i], imitators[i]);
+    //for(int i = 0; i < noOfAreas; i++) {
+    //    printf("%d | %.9Lf\n", households[i], imitators[i]);
+    //}
+    
+    printf("Type 'help' for a list of commands\n");
+    
+    int wantToQuit = 0;
+    while(wantToQuit == 0) {
+        char input[100];
+        fgets(input, 100, stdin);
+        strtok(input, "\n");
+        
+        int handled = 0;
+        
+        if(strcmp(input, "quit") == 0) {
+            handled = 1;
+            wantToQuit = 1;
+            printf("Exiting...\n");
+        } else if(strcmp(input, "help") == 0) {
+            handled = 1;
+            printf("----- HELP -----\n");
+            printf("help: commands\n");
+            printf("quit: exit the applicaiton\n");
+            printf("print loaded data: shows the data loaded from the data files\n");
+            printf("run: runs the GA\n");
+        } else if(strcmp(input, "run") == 0) {
+            handled = 1;
+        } else if(strcmp(input, "print loaded data") == 0) {
+            handled = 1;
+            printf("----- INFO -----\n");
+            printf("Number of areas: %d\n", noOfAreas);
+            printf("Study period: %d\n", studyPeriod);
+            printf("Annual rental charges: %.2f\n", rental);
+            printf("CAPEX: %.2f\n", capex);
+            printf("OPEX: %.2f\n", opex);
+            printf("Interest rate: %.1f\n", interest);
+            printf("Maximum rollout period: %d\n", maxRolloutPeriod);
+            printf("----- AREA DATA -----\n");
+            printf("area: households | imitator\n");
+            for(int i = 0; i < noOfAreas; i++) {
+                printf("%d: %d | %.9Lf\n", i, households[i], imitators[i]);
+            }
+        }
+        
+        if(handled == 0) {
+            printf("Command not understood. Try 'help'\n");
+        }
     }
-
+    
+    
+    
+    
     
     //srand((unsigned) time(NULL)); // Initialise rand seed based on system time
     //int population[POPULATION_SIZE][noOfAreas];
@@ -314,7 +369,6 @@ int main(int argc, const char * argv[]) {
     //    printf("%d\n",newPopulation[0][i]);
     //}
     //printIndividual(newPopulation[0]);
-    
     
     //int plan[3] = {0, 2, 1};
     //double result = model(plan);
