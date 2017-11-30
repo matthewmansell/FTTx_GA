@@ -252,6 +252,18 @@ void printIndividual(int individual[noOfAreas]) {
     printf("\n");
 }
 
+void printFitnessData(double fitness[POPULATION_SIZE]) {
+    double best = 0, worst = fitness[0], mean = 0;
+    for(int i = 0; i < POPULATION_SIZE; i++) {
+        mean += fitness[i];
+        if(fitness[i] > best) { best = fitness[i]; }
+        if(fitness[i] < worst) { worst = fitness[i]; }
+    }
+    mean = mean / POPULATION_SIZE;
+    printf("%.2f : %.2f : %.2f\n", worst, mean, best);
+}
+
+
 /* Main Evolutionary loop
  * param _Bool Print generational stats
  */
@@ -265,6 +277,8 @@ void run(int print) {
         generatePopulation(population, newPopulation, fitness);
         evaluate(newPopulation, fitness);
         copyPopulation(newPopulation, population);
+        printf("%d: ", generation+1);
+        printFitnessData(fitness);
     }
 }
 
