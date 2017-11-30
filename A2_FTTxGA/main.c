@@ -12,13 +12,12 @@
 #include <math.h>
 #include <unistd.h>
 #include <string.h>
-#include "header.h"
 
 #define POPULATION_SIZE 100
 #define GENERATIONS 100
 #define TOURNAMENT_SIZE 5
 
-static int noOfAreas = 10;
+static int noOfAreas = 3;
 static int studyPeriod = 10;
 static double rental = 2;
 static double capex = 500;
@@ -209,7 +208,7 @@ void crossover(int parent1[noOfAreas], int parent2[noOfAreas], int child1[noOfAr
  sets the content
  */
 void mutation(int parent[noOfAreas], int child[noOfAreas]) {
-    copyArray(parent, child); //Copy the individual
+    //copyArray(parent, child); //Copy the individual
     int area = rand() % noOfAreas; //Select random index
     parent[area] = rand() % studyPeriod; //Replace with random
 }
@@ -276,14 +275,29 @@ void runFor(int runs) {
 }
 
 int main(int argc, const char * argv[]) {
+    
+    //TEST MODEL
+    //households = (int*)malloc(noOfAreas*sizeof(int));
+    //imitators = (long double*)malloc(noOfAreas*sizeof(long double));
+    //households[0] = 100;
+    //households[1] = 100;
+    //households[2] = 1000;
+    //imitators[0] = 0.2;
+    //imitators[1] = 0.5;
+    //imitators[2] = 0.2;
+    //int plan[noOfAreas];
+    //plan[0] = 0;
+    //plan[1] = 2;
+    //plan[2] = 1;
+    //printf("%.2f\n", model(plan));
+    
     printf("----- OPTIMAL FFTx ROLLOUT GA -----\n");
     printf("Matthew Mansell (mcm36)\n");
-    
     
     char settingsFile[100], areasFile[100];
     strcpy(settingsFile, argv[1]); strcpy(areasFile, argv[2]);
     if(loadFTT(settingsFile, areasFile) != 1) {
-        printf("FFT GA cannot run without the correct data.\nExiting...\n");
+        printf("FTTx GA cannot run without the correct data.\nExiting...\n");
         return 0; //Exit
     }
     printf("FFT data loaded sucesfully.\n");
@@ -323,6 +337,7 @@ int main(int argc, const char * argv[]) {
             printf("run: runs the GA\n");
         } else if(strcmp(input, "run") == 0) {
             handled = 1;
+            run(1);
         } else if(strcmp(input, "print loaded data") == 0) {
             handled = 1;
             printf("----- INFO -----\n");
@@ -379,3 +394,4 @@ int main(int argc, const char * argv[]) {
     
     return 0;
 }
+
