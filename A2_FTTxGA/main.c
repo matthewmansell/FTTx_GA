@@ -1,6 +1,7 @@
 //
 //  main.c
-//  A2_FFT_MM
+//  A2_Optimat_FTTx_Rollout_MM
+//  Task A
 //
 //  Created by Matthew Mansell on 23/11/2017.
 //  Copyright © 2017 Matthew Mansell. All rights reserved.
@@ -13,10 +14,11 @@
 #include <unistd.h>
 #include <string.h>
 
-#define POPULATION_SIZE 1000
-#define GENERATIONS 1000
+#define POPULATION_SIZE 500
+#define GENERATIONS 800
 #define TOURNAMENT_SIZE 5
-#define MUTATION_CHANCE 5
+#define MUTATION_CHANCE 10
+#define RESULTS_FILE "results.txt"
 
 static int noOfAreas = 3;
 static int studyPeriod = 10;
@@ -29,11 +31,14 @@ static int maxRolloutPeriod = 10;
 static int *households;
 static long double *imitators;
 
+//static int *population[POPULATION_SIZE];
+
+// ############################################################################
+// #################### ----------- FILE READER ---------- ####################
 int loadFTT(char settingsFileName[], char areasFileName[]) {
     FILE *settingsFile, *areasFile;
     
     settingsFile = fopen(settingsFileName, "r");
-    
     //Load settings into global variables
     if(settingsFile == NULL) {
         perror("Error when attempting to open the settings file.\n");
@@ -133,6 +138,24 @@ int loadFTT(char settingsFileName[], char areasFileName[]) {
     return 1; //All tasks completed sucesfully
 }
 
+// ############################################################################
+// #################### ----------- FILE WRITER ---------- ####################
+void writeLog(char* msg) {
+    time_t t = time(NULL);
+    struct tm *tm = localtime(&t);
+    char date[19];
+    strftime(date, 19, "%x_%X\t\0", tm);
+    char log[120] = {'\0'};
+    strcat(log, date);
+    strcat(log, msg);
+    FILE *resultsFile = fopen(RESULTS_FILE, "a");
+    fputs(log, resultsFile);
+    fclose(resultsFile);
+}
+
+
+// ####################################################################################
+// #################### ----------- FTTx NPV CALCULATOR ---------- ####################
 /* Runs the given FTT rollout plan agains the model.
  * Return The final NPV for this plan.
  * Param origHouseholds An array containing
@@ -166,6 +189,7 @@ double model(int *plan) {
     return NPV;
 }
 
+// #################### ----------- POPULATION ---------- ####################
 /* Generates fitness values using data for the given population.
  * Param population The population to evaluate.
  * Param fitness The fitness array to populate.
@@ -281,7 +305,7 @@ void printIndividual(int *individual) {
     printf("\n");
 }
 
-void printFitnessData(double *fitness) {
+void fitnessStats(double *fitness, char* results) {
     double best = 0, worst = fitness[0], mean = 0;
     for(int i = 0; i < POPULATION_SIZE; i++) {
         mean += fitness[i];
@@ -289,42 +313,60 @@ void printFitnessData(double *fitness) {
         if(fitness[i] < worst) { worst = fitness[i]; }
     }
     mean = mean / POPULATION_SIZE;
-    printf("%.2f : %.2f : %.2f\n", worst, mean, best);
+    sprintf(results + strlen(results), "%.2f :\t%.2f :\t%.2f\n", worst, mean, best);
 }
 
 /* Main evolutionary loop
  * param int Print generational stats
  */
-void run(int print) {
-    int population[POPULATION_SIZE][noOfAreas];
-    initialise(population);
+double run(int print, char* results) {
+    int population[POPULATION_SIZE][noOfAreas], newPopulation[POPULATION_SIZE][noOfAreas];
     double fitness[POPULATION_SIZE];
+    initialise(population);
     evaluate(population, fitness);
-    printf("%d: ", 0);
-    printFitnessData(fitness);
-    //printf("Best: ");
-    //printIndividual(population[selectBest(fitness)]);
+    if(print == 1) { char stats[100] = {'\0'}; fitnessStats(fitness, stats); printf("%d: %s", 0, stats);}
     for(int generation = 1; generation < GENERATIONS; generation++) {
-        int newPopulation[POPULATION_SIZE][noOfAreas];
         generatePopulation(population, newPopulation, fitness);
         evaluate(newPopulation, fitness);
-        printf("%d: ", generation);
-        printFitnessData(fitness);
+        if(print == 1) { char stats[100] = {'\0'}; fitnessStats(fitness, stats); printf("%d: %s", generation, stats); }
         copyPopulation(newPopulation, population);
     }
-    printf("Best: ");
-    printIndividual(population[selectBest(fitness)]);
+    int best = selectBest(fitness);
+    if(print == 1) { printf("Best: "); printIndividual(population[best]); }
+    fitnessStats(fitness, results); //Write to given results array
+    return fitness[best];
 }
 
 void runFor(int runs) {
+    writeLog("RUN\tWorst:\t\tMean:\t\tBest:\n\0");
+    double results[runs], avg = 0, min = 0, max = 0, sd = 0;
     for(int runi = 0; runi < runs; runi++) {
-        run(1);
+        char print[100]; sprintf(print, "Run %d:\t", runi+1); //Statement to print
+        double result; //Local result store
+        result = run(1, print);
+        writeLog(print); //Print statement
+        results[runi] = result;
+        avg += result/runs;
+        if(result < min || runi == 0) min = result;
+        if(result > max) max = result;
     }
+    for(int i = 0; i < runs; i++) { //Calculate standard deviation
+        int deviation = (results[i] - avg) * (results[i] - avg);
+        sd += deviation/runs;
+    } sd = sqrt(sd);
+    char print[100];
+    sprintf(print, "Avg:\t%.2f\n", avg);
+    writeLog(print);
+    sprintf(print, "SD:\t%.2f\n", sd);
+    writeLog(print);
+    sprintf(print, "Max:\t%.2f\n", max);
+    writeLog(print);
+    sprintf(print, "Min:\t%.2f\n\n", min);
+    writeLog(print);
 }
 
 int main(int argc, const char * argv[]) {
     srand((unsigned) time(NULL)); // Initialise rand seed based on system time
-    
     //TEST MODEL
     //households = (int*)malloc(noOfAreas*sizeof(int));
     //imitators = (long double*)malloc(noOfAreas*sizeof(long double));
@@ -340,7 +382,8 @@ int main(int argc, const char * argv[]) {
     //plan[2] = 1;
     //printf("%.2f\n", model(plan));
     
-    printf("----- OPTIMAL FFTx ROLLOUT GA -----\n");
+    
+    printf("----- OPTIMAL FTTx ROLLOUT GA -----\n");
     printf("Matthew Mansell (mcm36)\n");
     
     char settingsFile[100], areasFile[100];
@@ -351,23 +394,8 @@ int main(int argc, const char * argv[]) {
     }
     printf("FFT data loaded sucesfully.\n");
     
-    //printf("Number of areas: %d\n", noOfAreas);
-    //printf("Study period: %d\n", studyPeriod);
-    //printf("Annual rental charges: %.2f\n", rental);
-    //printf("CAPEX: %.2f\n", capex);
-    //printf("OPEX: %.2f\n", opex);
-    //printf("Interest rate: %.1f\n", interest);
-    //printf("Maximum rollout period: %d\n", maxRolloutPeriod);
-    
-    //for(int i = 0; i < noOfAreas; i++) {
-    //    printf("%d | %.9Lf\n", households[i], imitators[i]);
-    //}
-    
-    int test[noOfAreas];
-    for(int i = 0; i < noOfAreas; i++) {
-        test[i] = 1;
-    }
-    printf("%.2f\n", model(test));
+    //Allocate memory for population
+    //for(int i = 0; i < POPULATION_SIZE; i++) { population[i] = (int *)malloc(noOfAreas * sizeof(int)); }
     
     printf("Type 'help' for a list of commands\n");
     
@@ -392,7 +420,7 @@ int main(int argc, const char * argv[]) {
             printf("run: runs the GA\n");
         } else if(strcmp(input, "run") == 0) {
             handled = 1;
-            run(1);
+            runFor(10);
         } else if(strcmp(input, "print loaded data") == 0) {
             handled = 1;
             printf("----- INFO -----\n");
@@ -415,35 +443,7 @@ int main(int argc, const char * argv[]) {
         }
     }
     
-    
-    
-    
-    
-    srand((unsigned) time(NULL)); // Initialise rand seed based on system time
-    //int population[POPULATION_SIZE][noOfAreas];
-    //initialise(population);
-    
-    //for(int i = 0; i < noOfAreas; i++) {
-    //    printf("%d\n",population[0][i]);
-    //}
-    //printIndividual(population[0]);
-    
-    //double fitness[POPULATION_SIZE];
-    //evaluate(population, fitness);
-    //printf("%f\n",fitness[0]);
-    
-    //int newPopulation[POPULATION_SIZE][noOfAreas];
-    //generatePopulation(population, newPopulation, fitness);
-    
-    //for(int i = 0; i < noOfAreas; i++) {
-    //    printf("%d\n",newPopulation[0][i]);
-    //}
-    //printIndividual(newPopulation[0]);
-    
-    //int plan[3] = {0, 2, 1};
-    //double result = model(plan);
-    //printf("%f\n",result);
-    
+    //Free allocated memory from loaded data
     free(households);
     free(imitators);
     
