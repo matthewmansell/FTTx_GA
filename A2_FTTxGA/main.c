@@ -1,7 +1,7 @@
 //
 //  main.c
 //  A2_Optimat_FTTx_Rollout_MM
-//  Task A
+//  Task B
 //
 //  Created by Matthew Mansell on 23/11/2017.
 //  Copyright © 2017 Matthew Mansell. All rights reserved.
@@ -14,10 +14,10 @@
 #include <unistd.h>
 #include <string.h>
 
-#define POPULATION_SIZE 500
-#define GENERATIONS 800
+#define POPULATION_SIZE 1000
+#define GENERATIONS 500
 #define TOURNAMENT_SIZE 5
-#define MUTATION_CHANCE 10
+#define MUTATION_CHANCE 20
 #define RESULTS_FILE "results.txt"
 
 static int noOfAreas = 3;
@@ -27,6 +27,7 @@ static double capex = 500;
 static double opex = 200;
 static double interest = 0.01;
 static int maxRolloutPeriod = 10;
+static double y1MaxSpend = 100000;
 
 static int *households;
 static long double *imitators;
@@ -204,8 +205,21 @@ void evaluate(int population[][noOfAreas], double *fitnessArray) {
  */
 void initialise(int population[][noOfAreas]) {
     for(int individual = 0; individual < POPULATION_SIZE; individual++) {
+        double y1Spend = 0;
+        
         for(int area = 0; area < noOfAreas; area++) {
-            population[individual][area] = rand() % (maxRolloutPeriod+1);
+            if(area < 10) { population[individual][area] = 0; }//Dont want to build in first 10 cities
+            else {
+                int canAdd = 0, value = 0;
+                do {
+                    value = rand() % (maxRolloutPeriod+1);
+                    if(value == 1) {
+                        if(y1Spend <= (y1MaxSpend-capex)) canAdd = 1;
+                    } else { canAdd = 1; }
+                } while(canAdd != 1);
+                if(value == 1) y1Spend += capex;
+                population[individual][area] = value;
+            }
         }
     }
 }
@@ -214,25 +228,29 @@ void initialise(int population[][noOfAreas]) {
  * sets the content of the 2 supplied children.
  */
 void crossover(int *parent1, int *parent2, int *child1, int *child2) {
+    
     int cop = rand() % noOfAreas-1; //Crossover point selection
-    //printf("######## COP %d\n",cop);
+    int c1Y1Spend = 0, c2Y1Spend = 0;
     for(int area = 0; area < cop; area++) { //Up to cop: copy from parent
-        //printf("p1 %p\n",&parent1[area]);
-        //printf("p2 %p\n",&parent2[area]);
-        //printf("c1 %p\n",&child1[area]);
-        //printf("c2 %p\n",&child2[area]);
         child1[area] = parent1[area];
+        if(child1[area] == 1) c1Y1Spend += capex;
         child2[area] = parent2[area];
-        //printf("Orig %d\n",area);
+        if(child2[area] == 1) c2Y1Spend += capex;
     }
     for(int area = cop; area < noOfAreas; area++) { //After cop: copy from alternate parent
-        //printf("p1 %p\n",&parent1[area]);
-        //printf("p2 %p\n",&parent2[area]);
-        //printf("c1 %p\n",&child1[area]);
-        //printf("c2 %p\n",&child2[area]);
-        child1[area] = parent2[area];
-        child2[area] = parent1[area];
-        //printf("Alt %d\n",area);
+        if(parent2[area] == 1) {
+            if(c1Y1Spend <= y1MaxSpend-capex) {
+                child1[area] = parent2[area];
+                c1Y1Spend += capex;
+            } else child1[area] = 0;
+        } else child1[area] = parent2[area];
+        
+        if(parent1[area] == 1) {
+            if(c2Y1Spend <= y1MaxSpend-capex) {
+                child2[area] = parent1[area];
+                c2Y1Spend += capex;
+            } else child2[area] = 0;
+        } else child2[area] = parent1[area];
     }
 }
 
@@ -240,11 +258,19 @@ void crossover(int *parent1, int *parent2, int *child1, int *child2) {
  sets the content
  */
 void mutation(int *parent, int *child) {
+    double y1Spend = 0;
     for(int i = 0; i < noOfAreas; i++) { //Copy all data
         child[i] = parent[i];
+        if(child[i] == 1) y1Spend += capex; // Count y1 builds
     }
-    int area = rand() % noOfAreas; //Select random index
-    child[area] = rand() % (maxRolloutPeriod+1); //Replace with random
+    int canBuildY1 = 0, canAdd = 0, value = 0;
+    if(y1Spend <= (y1MaxSpend-capex)) canBuildY1 = 1;
+    do {
+        value = rand() % (maxRolloutPeriod+1);
+        if((value == 1 && canBuildY1 == 1) || value != 1) canAdd = 1;
+    } while(canAdd != 1);
+    int area = 10 + rand() % (noOfAreas-10); //Select random index above 10
+    child[area] = value;
 }
 
 /* Returns an index from the given array.
@@ -319,7 +345,7 @@ void fitnessStats(double *fitness, char* results) {
 /* Main evolutionary loop
  * param int Print generational stats
  */
-double run(int print, char* results) {
+double run(int print, char* results, int *bestIndividual) {
     int population[POPULATION_SIZE][noOfAreas], newPopulation[POPULATION_SIZE][noOfAreas];
     double fitness[POPULATION_SIZE];
     initialise(population);
@@ -334,26 +360,45 @@ double run(int print, char* results) {
     int best = selectBest(fitness);
     if(print == 1) { printf("Best: "); printIndividual(population[best]); }
     fitnessStats(fitness, results); //Write to given results array
+    for(int i = 0; i < noOfAreas; i++) bestIndividual[i] = population[best][i]; //Copy of best
     return fitness[best];
 }
 
 void runFor(int runs) {
     writeLog("RUN\tWorst:\t\tMean:\t\tBest:\n\0");
     double results[runs], avg = 0, min = 0, max = 0, sd = 0;
+    int bestIndividual[noOfAreas];
     for(int runi = 0; runi < runs; runi++) {
         char print[100]; sprintf(print, "Run %d:\t", runi+1); //Statement to print
         double result; //Local result store
-        result = run(1, print);
+        int bestIndividualRun[noOfAreas];
+        result = run(1, print, bestIndividualRun);
         writeLog(print); //Print statement
         results[runi] = result;
         avg += result/runs;
         if(result < min || runi == 0) min = result;
-        if(result > max) max = result;
+        if(result > max) {
+            max = result;
+            for(int i = 0; i < noOfAreas; i++) bestIndividual[i] = bestIndividualRun[i];
+        }
     }
+    int no0 = 0, no1 = 0, no2 = 0, no3 = 0, no4 = 0;
+    for(int i = 0; i < noOfAreas; i++) {
+        if(bestIndividual[i] == 0) no0++;
+        if(bestIndividual[i] == 1) no1++;
+        if(bestIndividual[i] == 2) no2++;
+        if(bestIndividual[i] == 3) no3++;
+        if(bestIndividual[i] == 4) no4++;
+    }
+    printf("0s:%d\t1s:%d\t2s:%d\t3s:%d\t4s:%d", no0, no1, no2, no3, no4);
+    
+    
+    
+    
     for(int i = 0; i < runs; i++) { //Calculate standard deviation
-        int deviation = (results[i] - avg) * (results[i] - avg);
-        sd += deviation/runs;
-    } sd = sqrt(sd);
+        double deviation = pow(results[i] - avg, 2);
+        sd += deviation;
+    } sd = sqrt(sd/runs);
     char print[100];
     sprintf(print, "Avg:\t%.2f\n", avg);
     writeLog(print);
@@ -367,21 +412,6 @@ void runFor(int runs) {
 
 int main(int argc, const char * argv[]) {
     srand((unsigned) time(NULL)); // Initialise rand seed based on system time
-    //TEST MODEL
-    //households = (int*)malloc(noOfAreas*sizeof(int));
-    //imitators = (long double*)malloc(noOfAreas*sizeof(long double));
-    //households[0] = 100;
-    //households[1] = 100;
-    //households[2] = 1000;
-    //imitators[0] = 0.2;
-    //imitators[1] = 0.5;
-    //imitators[2] = 0.2;
-    //int plan[noOfAreas];
-    //plan[0] = 0;
-    //plan[1] = 2;
-    //plan[2] = 1;
-    //printf("%.2f\n", model(plan));
-    
     
     printf("----- OPTIMAL FTTx ROLLOUT GA -----\n");
     printf("Matthew Mansell (mcm36)\n");
@@ -393,9 +423,6 @@ int main(int argc, const char * argv[]) {
         return 0; //Exit
     }
     printf("FFT data loaded sucesfully.\n");
-    
-    //Allocate memory for population
-    //for(int i = 0; i < POPULATION_SIZE; i++) { population[i] = (int *)malloc(noOfAreas * sizeof(int)); }
     
     printf("Type 'help' for a list of commands\n");
     
