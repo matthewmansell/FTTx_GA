@@ -14,7 +14,7 @@
 #include <unistd.h>
 #include <string.h>
 
-#define POPULATION_SIZE 1000
+#define POPULATION_SIZE 500
 #define GENERATIONS 500
 #define TOURNAMENT_SIZE 5
 #define MUTATION_CHANCE 20
@@ -447,7 +447,7 @@ int main(int argc, const char * argv[]) {
             printf("run: runs the GA\n");
         } else if(strcmp(input, "run") == 0) {
             handled = 1;
-            runFor(10);
+            runFor(5);
         } else if(strcmp(input, "print loaded data") == 0) {
             handled = 1;
             printf("----- INFO -----\n");
