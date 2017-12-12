@@ -1,6 +1,6 @@
 //
 //  main.c
-//  A2_Optimat_FTTx_Rollout_MM
+//  A2_Optimal_FTTx_Rollout_MM
 //  Task B
 //
 //  Created by Matthew Mansell on 23/11/2017.
@@ -14,19 +14,19 @@
 #include <unistd.h>
 #include <string.h>
 
-#define POPULATION_SIZE 500
+#define POPULATION_SIZE 1500
 #define GENERATIONS 500
 #define TOURNAMENT_SIZE 5
-#define MUTATION_CHANCE 20
+#define MUTATION_CHANCE 10
 #define RESULTS_FILE "results.txt"
 
-static int noOfAreas = 3;
-static int studyPeriod = 10;
-static double rental = 2;
-static double capex = 500;
-static double opex = 200;
-static double interest = 0.01;
-static int maxRolloutPeriod = 10;
+static int noOfAreas = 0;
+static int studyPeriod = 0;
+static double rental = 0;
+static double capex = 0;
+static double opex = 0;
+static double interest = 0;
+static int maxRolloutPeriod = 0;
 static double y1MaxSpend = 100000;
 
 static int *households;
@@ -228,30 +228,39 @@ void initialise(int population[][noOfAreas]) {
  * sets the content of the 2 supplied children.
  */
 void crossover(int *parent1, int *parent2, int *child1, int *child2) {
-    
-    int cop = rand() % noOfAreas-1; //Crossover point selection
-    int c1Y1Spend = 0, c2Y1Spend = 0;
-    for(int area = 0; area < cop; area++) { //Up to cop: copy from parent
+    double c1Y1Spend = 0, c2Y1Spend = 0;
+    for(int area = 0; area < noOfAreas; area++) { //Copy entire parent
         child1[area] = parent1[area];
         if(child1[area] == 1) c1Y1Spend += capex;
         child2[area] = parent2[area];
         if(child2[area] == 1) c2Y1Spend += capex;
     }
-    for(int area = cop; area < noOfAreas; area++) { //After cop: copy from alternate parent
-        if(parent2[area] == 1) {
-            if(c1Y1Spend <= y1MaxSpend-capex) {
-                child1[area] = parent2[area];
-                c1Y1Spend += capex;
-            } else child1[area] = 0;
-        } else child1[area] = parent2[area];
-        
-        if(parent1[area] == 1) {
-            if(c2Y1Spend <= y1MaxSpend-capex) {
-                child2[area] = parent1[area];
-                c2Y1Spend += capex;
-            } else child2[area] = 0;
-        } else child2[area] = parent1[area];
+    int crossovers = 1 + rand() % (noOfAreas-1); //Least no. of crossovers
+    int changes[crossovers];
+    for(int i = 0; i < crossovers; i++) { //Perform required no. of crossovers
+        int cop = rand() % noOfAreas; //Point to swap
+        changes[i] = cop; //Remember the point we changed
+        //Calculate new Y1 spend for after swap
+        if(child1[cop] == 1 && child2[cop] != 1) { c1Y1Spend -= capex; c2Y1Spend += capex; }
+        if(child1[cop] != 1 && child2[cop] == 1) { c1Y1Spend += capex; c2Y1Spend -= capex; }
+        //Swap values
+        int valStore = child1[cop]; //Store value so its not lost
+        child1[cop] = child2[cop];
+        child2[cop] = valStore;
     }
+    int undoPoint = crossovers-1; //Select last change
+    while(c1Y1Spend > y1MaxSpend || c2Y1Spend > y1MaxSpend) {
+        int cop = changes[undoPoint]; //Point to swap back
+        //Calculate new Y1 spend for after swap
+        if(child1[cop] == 1 && child2[cop] != 1) { c1Y1Spend -= capex; c2Y1Spend += capex; }
+        if(child1[cop] != 1 && child2[cop] == 1) { c1Y1Spend += capex; c2Y1Spend -= capex; }
+        //Swap values
+        int valStore = child1[cop]; //Store value so its not lost
+        child1[cop] = child2[cop];
+        child2[cop] = valStore;
+        undoPoint--;
+    }
+    
 }
 
 /* Performs a single point mutation on the parent supplied,
@@ -447,7 +456,7 @@ int main(int argc, const char * argv[]) {
             printf("run: runs the GA\n");
         } else if(strcmp(input, "run") == 0) {
             handled = 1;
-            runFor(5);
+            runFor(10);
         } else if(strcmp(input, "print loaded data") == 0) {
             handled = 1;
             printf("----- INFO -----\n");
