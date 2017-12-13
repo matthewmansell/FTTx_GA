@@ -14,10 +14,11 @@
 #include <unistd.h>
 #include <string.h>
 
-#define POPULATION_SIZE 1500
-#define GENERATIONS 500
+#define POPULATION_SIZE 5000
+#define GENERATIONS 100
 #define TOURNAMENT_SIZE 5
-#define MUTATION_CHANCE 10
+#define MUTATION_CHANCE 5
+#define MUTATION_POINTS 2
 #define RESULTS_FILE "results.txt"
 
 static int noOfAreas = 0;
@@ -32,7 +33,8 @@ static double y1MaxSpend = 100000;
 static int *households;
 static long double *imitators;
 
-//static int *population[POPULATION_SIZE];
+static int *population[POPULATION_SIZE];
+static int *newPopulation[POPULATION_SIZE];
 
 // ############################################################################
 // #################### ----------- FILE READER ---------- ####################
@@ -195,18 +197,17 @@ double model(int *plan) {
  * Param population The population to evaluate.
  * Param fitness The fitness array to populate.
  */
-void evaluate(int population[][noOfAreas], double *fitnessArray) {
+void evaluate(int **subjectPop, double *fitnessArray) {
     for(int individual = 0; individual < POPULATION_SIZE; individual++) {
-        fitnessArray[individual] = model(population[individual]);
+        fitnessArray[individual] = model(subjectPop[individual]);
     }
 }
 
 /* Initialises, with random values, the given population.
  */
-void initialise(int population[][noOfAreas]) {
+void initialise() {
     for(int individual = 0; individual < POPULATION_SIZE; individual++) {
         double y1Spend = 0;
-        
         for(int area = 0; area < noOfAreas; area++) {
             if(area < 10) { population[individual][area] = 0; }//Dont want to build in first 10 cities
             else {
@@ -224,7 +225,7 @@ void initialise(int population[][noOfAreas]) {
     }
 }
 
-/* Performs a single point crossover on the 2 parents supplied,
+/* Performs a crossover on the 2 parents supplied,
  * sets the content of the 2 supplied children.
  */
 void crossover(int *parent1, int *parent2, int *child1, int *child2) {
@@ -260,10 +261,9 @@ void crossover(int *parent1, int *parent2, int *child1, int *child2) {
         child2[cop] = valStore;
         undoPoint--;
     }
-    
 }
 
-/* Performs a single point mutation on the parent supplied,
+/* Performs a two point mutation on the parent supplied,
  sets the content
  */
 void mutation(int *parent, int *child) {
@@ -272,14 +272,19 @@ void mutation(int *parent, int *child) {
         child[i] = parent[i];
         if(child[i] == 1) y1Spend += capex; // Count y1 builds
     }
-    int canBuildY1 = 0, canAdd = 0, value = 0;
-    if(y1Spend <= (y1MaxSpend-capex)) canBuildY1 = 1;
-    do {
-        value = rand() % (maxRolloutPeriod+1);
-        if((value == 1 && canBuildY1 == 1) || value != 1) canAdd = 1;
-    } while(canAdd != 1);
-    int area = 10 + rand() % (noOfAreas-10); //Select random index above 10
-    child[area] = value;
+    for(int i = 0; i < MUTATION_POINTS; i++) {
+        int canBuildY1 = 0, canAdd = 0, value = 0;
+        if(y1Spend <= (y1MaxSpend-capex)) canBuildY1 = 1; //Can we introduce any 1s?
+        do { //Ensure that our new random value meets the criteria
+            value = rand() % (maxRolloutPeriod+1);
+            if(value == 1 && canBuildY1 == 1) {
+                canAdd = 1;
+                y1Spend += capex; //Adding a 1 so increase capex for next mutation calc
+            } else if(value != 1) canAdd = 1;
+        } while(canAdd != 1);
+        int area = 10 + rand() % (noOfAreas-10); //Select random index above 10
+        child[area] = value; //Apply mutation
+    }
 }
 
 /* Returns an index from the given array.
@@ -309,23 +314,23 @@ int selectBest(double *fitness) {
  * writing the new population to the supplied child/new population,
  * using the provided fitness array for judgement.
  */
-void generatePopulation(int parentPopulation[][noOfAreas], int newPopulation[][noOfAreas], double *fitness) {
+void generatePopulation(double *fitness) {
     //Elitism
     for(int area = 0; area < noOfAreas; area++) {
-        newPopulation[0][area] = parentPopulation[selectBest(fitness)][area];
+        newPopulation[0][area] = population[selectBest(fitness)][area];
     }
     
     for(int individual = 1; individual < POPULATION_SIZE; individual++) {
-        if(rand() % 100 < MUTATION_CHANCE || individual == POPULATION_SIZE-2) {
-            mutation(parentPopulation[tournamentSelect(fitness)], newPopulation[individual]);
+        if(rand() % 100 < MUTATION_CHANCE || individual > POPULATION_SIZE-2) {
+            mutation(population[tournamentSelect(fitness)], newPopulation[individual]);
         } else {
-            crossover(parentPopulation[tournamentSelect(fitness)], parentPopulation[tournamentSelect(fitness)], newPopulation[individual], newPopulation[individual+1]);
+            crossover(population[tournamentSelect(fitness)], population[tournamentSelect(fitness)], newPopulation[individual], newPopulation[individual+1]);
             individual++; //Additional increment
         }
     }
 }
 
-void copyPopulation(int srcPopulation[][noOfAreas], int destPopulation[][noOfAreas]) {
+void copyPopulation(int *srcPopulation[POPULATION_SIZE], int *destPopulation[POPULATION_SIZE]) {
     for(int individual = 0; individual < POPULATION_SIZE; individual++) {
         for(int area = 0; area < noOfAreas; area++) {
             destPopulation[individual][area] = srcPopulation[individual][area];
@@ -355,13 +360,13 @@ void fitnessStats(double *fitness, char* results) {
  * param int Print generational stats
  */
 double run(int print, char* results, int *bestIndividual) {
-    int population[POPULATION_SIZE][noOfAreas], newPopulation[POPULATION_SIZE][noOfAreas];
+    //int population[POPULATION_SIZE][noOfAreas], newPopulation[POPULATION_SIZE][noOfAreas];
     double fitness[POPULATION_SIZE];
-    initialise(population);
+    initialise();
     evaluate(population, fitness);
     if(print == 1) { char stats[100] = {'\0'}; fitnessStats(fitness, stats); printf("%d: %s", 0, stats);}
     for(int generation = 1; generation < GENERATIONS; generation++) {
-        generatePopulation(population, newPopulation, fitness);
+        generatePopulation(fitness);
         evaluate(newPopulation, fitness);
         if(print == 1) { char stats[100] = {'\0'}; fitnessStats(fitness, stats); printf("%d: %s", generation, stats); }
         copyPopulation(newPopulation, population);
@@ -433,6 +438,15 @@ int main(int argc, const char * argv[]) {
     }
     printf("FFT data loaded sucesfully.\n");
     
+    //Allocate memory for populations
+    for(int i = 0; i < POPULATION_SIZE; i++) {
+        population[i] = malloc(noOfAreas * sizeof(int));
+        newPopulation[i] = malloc(noOfAreas * sizeof(int));
+    }
+    
+    //population = (int*)malloc(POPULATION_SIZE*noOfAreas*sizeof(int));
+    //newPopulation = (int*)malloc(POPULATION_SIZE*noOfAreas*sizeof(int));
+    
     printf("Type 'help' for a list of commands\n");
     
     int wantToQuit = 0;
@@ -479,9 +493,11 @@ int main(int argc, const char * argv[]) {
         }
     }
     
-    //Free allocated memory from loaded data
+    //Free allocated memory
     free(households);
     free(imitators);
+    free(population); //FIX THIS!!!!
+    free(newPopulation); //FIX THIS!!!!
     
     return 0;
 }
