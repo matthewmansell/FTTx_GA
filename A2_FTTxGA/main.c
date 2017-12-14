@@ -15,11 +15,12 @@
 #include <string.h>
 
 #define POPULATION_SIZE 3000                //
-#define GENERATIONS 200                     //
+#define GENERATIONS 150                     //
 #define TOURNAMENT_SIZE 5                   //Tournament size
 #define MUTATION_CHANCE 5                   //Mutation % chance
 #define MUTATION_POINTS 2                   //The number of points changed per mutation
 #define RESULTS_FILE "results.txt"          //Results file name
+#define PLAN_FILE "plan.txt"                //Plan file name
 
 static int noOfAreas = 0;                   //
 static int studyPeriod = 0;                 //
@@ -438,6 +439,19 @@ void runFor(int runs) {
     writeLog(print);
     sprintf(print, "Min:\t%.2f\n\n", min);
     writeLog(print);
+    //Write the best plan to file
+    char plan[1000];
+    sprintf(plan, "Fitness: %.2f\n", max);
+    for(int i = 0; i < noOfAreas; i++) {
+        char ad[3];
+        sprintf(ad, "%d,", bestIndividual[i]);
+        strcat(plan, ad);
+    }
+    FILE *resultsFile = fopen(PLAN_FILE, "w"); //Open the log file, if it doesnt exist it will be created.
+    fputs(plan, resultsFile);
+    fclose(resultsFile);
+    
+    
 }
 
 // ##############################################################################
@@ -465,7 +479,7 @@ int main(int argc, const char * argv[]) {
         fgets(input, 100, stdin);
         strtok(input, "\n");
         int handled = 0;
-        if(strcmp(input, "quit") == 0) {
+        if(strcmp(input, "quit") == 0 || strcmp(input, "exit") == 0) {
             handled = 1;
             wantToQuit = 1;
             printf("Exiting...\n");
@@ -473,12 +487,12 @@ int main(int argc, const char * argv[]) {
             handled = 1;
             printf("----- HELP -----\n");
             printf("help: commands\n");
-            printf("quit: exit the applicaiton\n");
+            printf("quit/exit: exit the applicaiton\n");
             printf("print loaded data: shows the data loaded from the data files\n");
             printf("run: runs the GA\n");
         } else if(strcmp(input, "run") == 0) {
             handled = 1;
-            runFor(10);
+            runFor(1);
         } else if(strcmp(input, "print loaded data") == 0) {
             handled = 1;
             printf("----- INFO -----\n");
@@ -502,8 +516,11 @@ int main(int argc, const char * argv[]) {
     //Free allocated memory
     free(households);
     free(imitators);
-    free(population); //FIX THIS!!!!
-    free(newPopulation); //FIX THIS!!!!
+    //Free memory for populations
+    for(int i = 0; i < POPULATION_SIZE; i++) {
+        free(population[i]);
+        free(newPopulation[i]);
+    }
     return 0;
 }
 
