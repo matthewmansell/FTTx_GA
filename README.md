@@ -11,7 +11,7 @@ Calculated from given area population and potential uptake rates.
 - Generations: 150
 
 ## Additional Features
-- Problem files loader (settings and areas files)
+- Problem file loader (settings and areas files)
 - Results file log
 
 ## 'Random Point Crossover With Rollback'
