@@ -1,6 +1,5 @@
 # FTTx_GA
-GA to find optimal rollout plans for fibre to the cabinet. 
-<br />
+GA to find optimal rollout plans for fibre to the cabinet.<br/>
 Calculated from given area population and potential uptake rates.
 
 ## Setup
@@ -16,7 +15,7 @@ Calculated from given area population and potential uptake rates.
 - Results file log
 
 ## 'Random Point Crossover With Rollback'
-Custom crossover method to avoid array placement bias and maximise crossovers when ensuring valid solution. 
+Custom crossover method to avoid array placement bias and maximise crossovers when ensuring valid solution.<br/>
 Efficient and progressive compared to unary approach to fault scanning.
 
 1. Decides number of points to crossover.
